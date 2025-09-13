@@ -1,14 +1,20 @@
 const express = require('express');
-const aiRoutes = require('./routes/ai.routes')
+const cors = require('cors');
+const aiRoutes = require('./routes/ai.routes');
+
 const app = express();
 
-app.use(express.json())
+// Middlewares
+app.use(cors({
+  origin: 'http://localhost:5173', // your React frontend URL
+}));
+app.use(express.json());
 
-app.get('/', (req,res)=>{
-res.send('hello world')
-})
+// Routes
+app.get('/', (req, res) => {
+  res.send('hello world');
+});
 
-app.use('/ai', aiRoutes)
-
+app.use('/ai', aiRoutes);
 
 module.exports = app;
