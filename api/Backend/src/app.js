@@ -1,19 +1,12 @@
-const express = require("express");
-const cors = require("cors");
-const aiRoutes = require("./routes/ai.routes");
-
+const express = require('express');
+const cors = require('cors');
 const app = express();
+const aiRoutes = require('./routes/ai.routes');
 
-// Middlewares
-app.use(
-  cors({
-    origin: "*", 
-  })
-);
 app.use(express.json());
+app.use(cors());
 
-// API Routes
-// Remove the '/api' prefix here
-app.use("/", aiRoutes);
+// Use the aiRoutes for all requests to '/api'
+app.use('/api', aiRoutes);
 
 module.exports = app;
