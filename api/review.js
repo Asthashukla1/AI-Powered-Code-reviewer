@@ -1,5 +1,5 @@
 // /api/review.js
-import generateReview from "../services/ai.service.js";
+const generateReview = require("../services/ai.service.js").default;
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
