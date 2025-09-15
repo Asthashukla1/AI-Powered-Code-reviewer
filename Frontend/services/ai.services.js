@@ -1,7 +1,5 @@
-// /services/ai.service.js
-import { GoogleGenAI } from "@google/genai";
-
-const ai = new GoogleGenAI({ apiKey: process.env.GOOGLE_GEMINI_KEY });
+// services/ai.services.js
+import axios from "axios";
 
 export default async function generateReview(code) {
   const systemInstructions = `
@@ -15,26 +13,20 @@ You are a professional code reviewer. Respond ONLY in JSON like:
   ]
 }`;
 
-  const response = await ai.models.generateContent({
-    model: "gemini-2.5-flash",
-    systemInstructions,
-    contents: [{ role: "user", parts: [{ text: code }] }],
-  });
-
-  let aiText = response?.candidates?.[0]?.content?.parts?.[0]?.text || "";
-
-  const jsonMatch = aiText.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) {
-    return {
-      review: [{ title: "Error", content: "AI returned invalid JSON." }],
-    };
-  }
-
   try {
+    const response = await axios.post("/api/review", { code });
+    let aiText = response?.data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    const jsonMatch = aiText.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      return {
+        review: [{ title: "Error", content: "AI returned invalid JSON." }],
+      };
+    }
     return JSON.parse(jsonMatch[0]);
-  } catch {
+  } catch (error) {
+    console.error("API call failed:", error);
     return {
-      review: [{ title: "Error", content: "Could not parse AI response." }],
+      review: [{ title: "Error", content: "Failed to connect to the backend." }],
     };
   }
 }
