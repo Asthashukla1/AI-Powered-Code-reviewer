@@ -7,13 +7,13 @@ const app = express();
 // Middlewares
 app.use(
   cors({
-    origin: "*", // Allow all origins since this is an API endpoint
+    origin: "*", 
   })
 );
 app.use(express.json());
 
 // API Routes
-app.use("/api", aiRoutes);
+// Remove the '/api' prefix here
+app.use("/", aiRoutes);
 
-// Export the app for Vercel's serverless function
 module.exports = app;
