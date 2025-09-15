@@ -19,21 +19,22 @@ export default function CodeReviewer() {
   const [language, setLanguage] = useState("javascript");
 
   const handleReview = async () => {
-    if (!code.trim()) return;
-    setLoading(true);
+  if (!code.trim()) return;
+  setLoading(true);
 
-    try {
-      const { data } = await axios.post("/ai/review", { code, language });
-      setReview(
-        data.review || [{ title: "AI Review", content: "No response from server" }]
-      );
-    } catch (err) {
-      console.error(err);
-      setReview([{ title: "AI Review", content: "Failed to fetch review" }]);
-    }
+  try {
+    const { data } = await axios.post("/api/review", { code, language });
+    setReview(
+      data.review || [{ title: "AI Review", content: "No response from server" }]
+    );
+  } catch (err) {
+    console.error(err);
+    setReview([{ title: "AI Review", content: "Failed to fetch review" }]);
+  }
 
-    setLoading(false);
-  };
+  setLoading(false);
+};
+
 
   return (
     <div className="h-screen w-screen grid grid-cols-2 bg-gray-900 text-gray-200">
