@@ -1,4 +1,6 @@
-// This file will act as the entry point for Vercel's serverless function
+// api/index.js
+const serverless = require("serverless-http");
 const app = require("./Backend/src/app");
 
-module.exports = app;
+// Export as a serverless function for Vercel
+module.exports = serverless(app);
