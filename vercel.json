@@ -1,0 +1,9 @@
+{
+  "rewrites": [
+    {
+      "source": "/ai/:match*",
+      "destination": "/Backend/src/app.js"
+    }
+  ],
+  "installCommand": "npm install --prefix Backend && npm install --prefix Frontend"
+}
