@@ -69,7 +69,7 @@ export default function CodeReviewer() {
     <div className="min-h-screen bg-gray-950 text-gray-100 flex flex-col">
       {/* Header */}
       <header className="p-4 border-b border-gray-800 flex justify-between items-center bg-gray-900 shadow-md">
-        <h1 className="text-3xl font-extrabold text-blue-500">
+        <h1 className="text-3xl font-extrabold text-blue-500 items-center">
           Gemini Code Reviewer 🤖
         </h1>
         <a

@@ -1,85 +1,69 @@
-// Backend/src/services/ai.service.js - Corrected & JSON-Enforced
-
+// services/ai.service.js
 const { GoogleGenAI } = require("@google/genai");
 
-// Singleton AI client
-let ai = null;
+let aiClient = null;
 
-/**
- * Initialize the Gemini AI client.
- */
-function initAI() {
-  if (!ai) {
-    if (!process.env.GOOGLE_GEMINI_KEY) {
-      throw new Error("GOOGLE_GEMINI_KEY is missing in .env");
+function initializeClient() {
+    if (aiClient) {
+        return aiClient;
     }
-    ai = new GoogleGenAI({ apiKey: process.env.GOOGLE_GEMINI_KEY });
-  }
-  return ai;
+    
+    const GEMINI_API_KEY = process.env.GOOGLE_GEMINI_KEY;
+
+    if (!GEMINI_API_KEY) {
+        console.error("--- CRITICAL CONFIG ERROR ---");
+        console.error("GOOGLE_GEMINI_KEY environment variable is NOT SET.");
+        console.error("The AI service cannot authenticate.");
+        console.error("-----------------------------");
+        throw new Error("API service failed to initialize due to missing GOOGLE_GEMINI_KEY.");
+    }
+    
+    aiClient = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
+    return aiClient;
 }
 
+
 /**
- * Generates a code review using the Gemini API.
- * @param {string} code The code snippet to review.
- * @param {string} language The programming language of the code.
- * @returns {Promise<object>} The structured review object.
+ * Generates a code review using the Gemini API, returning plain, human-readable text.
  */
 async function generateReview(code, language) {
-  const aiClient = initAI();
-
- const systemInstructions = `
-You are a professional code reviewer.
-The user will provide a short JavaScript snippet (3-5 lines).
-Return ONLY a JSON object, in this exact format:
-
-{
-  "issues": ["list of issues here"],
-  "suggestions": ["list of improvements here"],
-  "fixedCode": "corrected code snippet as string"
-}
-
-Do NOT include explanations, markdown, or any text outside JSON.
-`;
-
-
-  const userPrompt = `Review the following ${language} code:\n\n${code}`;
-
   try {
-    const response = await aiClient.models.generateContent({
-      model: "gemini-2.5-flash",
-      systemInstruction: systemInstructions,
-      contents: [{ role: "user", parts: [{ text: userPrompt }] }],
-      generationConfig: {
-        responseMimeType: "application/json", // force JSON output
-      },
+    const ai = initializeClient(); 
+    
+    // FIX: Simplified and updated prompt to request PLAIN TEXT, concise summary
+    const systemInstructions = `
+You are a professional code reviewer. The user has provided a snippet in ${language}.
+Analyze the code for four sections: Performance, Readability, Security, and Suggestions.
+Provide a clear, concise, and professional code review. 
+Your entire output should be a single human-readable text block. 
+Use clear markdown headings (##) for each section and brief, concise bullet points for feedback.
+Do NOT include any JSON, YAML, XML, or code fences (\`\`\`) in your final output.
+`;
+    const userPrompt = `Review the following ${language} code:\n\n${code}`;
+  
+    const response = await ai.models.generateContent({
+        model: "gemini-2.5-flash", 
+        systemInstructions,
+        contents: [{ role: "user", parts: [{ text: userPrompt }] }],
     });
 
     const aiText = response?.candidates?.[0]?.content?.parts?.[0]?.text || "";
 
-    try {
-      // Parse JSON directly
-      return JSON.parse(aiText);
-    } catch (jsonErr) {
-      console.error("JSON Parsing Error:", jsonErr);
-      return {
-        review: [
-          {
-            title: "AI Response Error",
-            content: `AI returned invalid JSON. Raw response: ${aiText}`,
-          },
-        ],
-      };
-    }
-  } catch (apiErr) {
-    console.error("Gemini API Error:", apiErr);
+    // The output is already plain text, return it wrapped in a simple object for the controller
     return {
-      review: [
-        {
-          title: "API Call Failed",
-          content: `There was a problem communicating with the AI service. Check server logs for details. Error: ${apiErr.message}`,
-        },
-      ],
+        // We use a single 'review' field to hold the entire plain text output
+        review: [
+            { title: "Full AI Code Review", content: aiText },
+        ],
     };
+
+  } catch (error) {
+      console.error("Gemini API Error (Caught):", error.message);
+      return {
+          review: [
+              { title: "Service Unavailable", content: `A critical service error occurred. Check your backend console for details. Error: ${error.message}` },
+          ],
+      };
   }
 }
 
