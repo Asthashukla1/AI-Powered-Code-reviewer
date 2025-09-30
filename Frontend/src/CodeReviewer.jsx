@@ -19,7 +19,6 @@ import "prismjs/components/prism-cpp";
 const ReviewSection = ({ section }) => (
   <div className="p-4 bg-gray-800 border border-gray-700 rounded-xl shadow-lg transition hover:shadow-xl hover:border-blue-600">
     <h3 className="font-bold text-lg text-blue-400 mb-2">{section.title}</h3>
-    {/* Use <p> instead of <pre> if content is already pre-formatted or Markdown, for better wrapping */}
     <p className="whitespace-pre-wrap text-gray-300 text-sm leading-relaxed">
       {section.content}
     </p>
@@ -31,12 +30,10 @@ const ReviewSection = ({ section }) => (
  */
 export default function CodeReviewer() {
   const [code, setCode] = useState("");
-  // Use null for initial state to display the introductory message
   const [review, setReview] = useState(null); 
   const [loading, setLoading] = useState(false);
   const [language, setLanguage] = useState("javascript");
 
-  // Language options must align with the Prism imports
   const languageOptions = [
     { value: "javascript", label: "JavaScript" },
     { value: "python", label: "Python" },
@@ -50,10 +47,11 @@ export default function CodeReviewer() {
     setLoading(true);
     setReview(null); 
 
-    // FIX: Correct API endpoint to match Express routing: /ai is the base route + /review is the post route
+    // FIX: Correct API endpoint to match Express routing: /ai/review
     const backendEndpoint = "/ai/review"; 
 
     try {
+      // Pass both code and selected language to the backend
       const { data } = await axios.post(backendEndpoint, { code, language });
       setReview(
         Array.isArray(data.review) && data.review.length > 0
@@ -62,7 +60,7 @@ export default function CodeReviewer() {
       );
     } catch (err) {
       console.error("API Error:", err);
-      // Better error handling for user
+      // Better error handling extraction for user
       const errorMessage = err.response?.data?.review?.[0]?.content || err.message || "Failed to connect to the server.";
       setReview([{ title: "Request Failed", content: `Error: ${errorMessage}. Check console for details.` }]);
     } finally {
@@ -110,13 +108,11 @@ export default function CodeReviewer() {
             <Editor
               value={code}
               onValueChange={setCode}
-              // Use a fallback grammar if the selected language is not supported by Prism (e.g., 'clike')
               highlight={(inputCode) => {
                 const grammar = Prism.languages[language] || Prism.languages.clike;
                 return Prism.highlight(inputCode, grammar, language);
               }}
-              padding={20}
-              className="editor-with-lines w-full h-full font-mono text-sm bg-gray-800 text-gray-200 border border-gray-700 rounded-xl focus:outline-none overflow-auto shadow-inner"
+              className="editor-wrapper w-full h-full font-mono text-sm bg-gray-800 text-gray-200 border border-gray-700 rounded-xl focus:outline-none overflow-auto shadow-inner"
               placeholder={`Paste your ${language} code here...`}
               style={{
                 fontFamily: '"Fira Code", "Consolas", monospace',
@@ -124,38 +120,47 @@ export default function CodeReviewer() {
                 tabSize: 2,
                 lineHeight: "1.6",
                 minHeight: '100%',
+                // FIX for cursor alignment: Apply necessary padding here.
+                padding: 20, 
+                paddingLeft: 60, // Sufficient left padding for line numbers
               }}
             />
-            {/* Custom CSS for line numbers - moved inside component as style tag with updated colors */}
+            
+            {/* FIX: Custom CSS for line numbers adjusted for correct cursor alignment */}
             <style jsx="true" global="true">{`
-                .editor-with-lines {
+                .editor-wrapper {
                   counter-reset: line;
-                  padding-left: 3.5em !important; /* Increased padding for line numbers */
-                  white-space: pre-wrap;
+                  /* Removing padding from the outer div as padding in style prop targets inner content */
+                  padding-left: 0 !important; 
                 }
         
-                .editor-with-lines textarea {
+                .editor-wrapper textarea {
                     white-space: pre-wrap;
                 }
 
-                .editor-with-lines pre code {
+                .editor-wrapper pre code {
                   counter-reset: line;
                 }
         
-                .editor-with-lines pre code span {
+                .editor-wrapper pre code span {
                   display: block;
                   counter-increment: line;
+                  position: relative; 
                 }
         
-                .editor-with-lines pre code span::before {
-                  content: counter(line);
-                  display: inline-block;
-                  width: 2em;
-                  margin-right: 1.2em;
-                  text-align: right;
-                  color: #4b5563; /* Tailwind gray-600 */
-                  user-select: none;
-                  font-size: 12px;
+                .editor-wrapper pre code span::before {
+                    content: counter(line);
+                    display: inline-block;
+                    width: 2.5em; /* Width of the line number column */
+                    text-align: right;
+                    color: #4b5563; /* Tailwind gray-600 */
+                    user-select: none;
+                    font-size: 12px;
+                    
+                    /* New Alignment Fix: Absolute position the line number */
+                    position: absolute;
+                    left: 20px; 
+                    transform: translateX(-100%); 
                 }
               `}</style>
           </div>
@@ -208,7 +213,6 @@ export default function CodeReviewer() {
               </div>
             )}
             
-            {/* Fallback for empty or unsuccessful response */}
             {review && review.length === 0 && !loading && (
                 <div className="p-6 bg-gray-800 border border-red-500 rounded-xl text-center">
                     <p className="text-red-400">Failed to retrieve or parse review content. Check the server console for errors.</p>
