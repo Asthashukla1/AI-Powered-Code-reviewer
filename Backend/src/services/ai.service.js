@@ -1,9 +1,22 @@
-// Backend/src/services/ai.service.js - Definitive Fix
+// Backend/src/services/ai.service.js - Corrected & JSON-Enforced
 
 const { GoogleGenAI } = require("@google/genai");
 
-// Use a variable to hold the initialized client. Set to null initially.
-let ai = null; 
+// Singleton AI client
+let ai = null;
+
+/**
+ * Initialize the Gemini AI client.
+ */
+function initAI() {
+  if (!ai) {
+    if (!process.env.GOOGLE_GEMINI_KEY) {
+      throw new Error("GOOGLE_GEMINI_KEY is missing in .env");
+    }
+    ai = new GoogleGenAI({ apiKey: process.env.GOOGLE_GEMINI_KEY });
+  }
+  return ai;
+}
 
 /**
  * Generates a code review using the Gemini API.
@@ -12,70 +25,61 @@ let ai = null;
  * @returns {Promise<object>} The structured review object.
  */
 async function generateReview(code, language) {
-  // FIX: Initialize the client only if it hasn't been done yet.
-  // This ensures the client is instantiated AFTER dotenv has run in server.js.
-  if (!ai) {
-    try {
-      // Explicitly pass the API key from the environment variable 
-      ai = new GoogleGenAI({ apiKey: process.env.GOOGLE_GEMINI_KEY }); 
-      
-      if (!process.env.GOOGLE_GEMINI_KEY) {
-        throw new Error("GOOGLE_GEMINI_KEY is missing from environment variables.");
-      }
-    } catch (initError) {
-        console.error("AI Service Initialization Error:", initError);
-        // Throw the error to be caught by the controller's main try/catch block
-        throw new Error("API service failed to initialize. Check GOOGLE_GEMINI_KEY in .env");
-    }
-  }
+  const aiClient = initAI();
 
-  const systemInstructions = `
-You are a professional code reviewer. The user has provided a snippet in ${language}.
-Analyze the code for:
-// ... (rest of system instructions are the same)
+ const systemInstructions = `
+You are a professional code reviewer.
+The user will provide a short JavaScript snippet (3-5 lines).
+Return ONLY a JSON object, in this exact format:
+
+{
+  "issues": ["list of issues here"],
+  "suggestions": ["list of improvements here"],
+  "fixedCode": "corrected code snippet as string"
+}
+
+Do NOT include explanations, markdown, or any text outside JSON.
 `;
-  // ... (rest of the generateContent call and parsing logic remains the same)
+
 
   const userPrompt = `Review the following ${language} code:\n\n${code}`;
-  
+
   try {
-      const response = await ai.models.generateContent({
-          model: "gemini-2.5-flash",
-          systemInstructions,
-          contents: [{ role: "user", parts: [{ text: userPrompt }] }],
-      });
+    const response = await aiClient.models.generateContent({
+      model: "gemini-2.5-flash",
+      systemInstruction: systemInstructions,
+      contents: [{ role: "user", parts: [{ text: userPrompt }] }],
+      generationConfig: {
+        responseMimeType: "application/json", // force JSON output
+      },
+    });
 
-      const aiText = response?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    const aiText = response?.candidates?.[0]?.content?.parts?.[0]?.text || "";
 
-      // Attempt to extract and parse JSON, accommodating potential wrapping issues.
-      const jsonMatch = aiText.match(/\{[\s\S]*\}/);
-
-      if (jsonMatch) {
-          try {
-              // Return the parsed JSON object
-              return JSON.parse(jsonMatch[0]);
-          } catch (err) {
-              console.error("JSON Parsing Error:", err);
-              return {
-                  review: [
-                      { title: "AI Response Error", content: `AI returned invalid JSON. Raw response: ${aiText}` },
-                  ],
-              };
-          }
-      }
-
+    try {
+      // Parse JSON directly
+      return JSON.parse(aiText);
+    } catch (jsonErr) {
+      console.error("JSON Parsing Error:", jsonErr);
       return {
-          review: [
-              { title: "AI Response Error", content: `AI did not return expected JSON format. Raw output: ${aiText}` },
-          ],
+        review: [
+          {
+            title: "AI Response Error",
+            content: `AI returned invalid JSON. Raw response: ${aiText}`,
+          },
+        ],
       };
-  } catch (error) {
-      console.error("Gemini API Error:", error);
-      return {
-          review: [
-              { title: "API Call Failed", content: `There was a problem communicating with the AI service. Check server logs for details. Error: ${error.message}` },
-          ],
-      };
+    }
+  } catch (apiErr) {
+    console.error("Gemini API Error:", apiErr);
+    return {
+      review: [
+        {
+          title: "API Call Failed",
+          content: `There was a problem communicating with the AI service. Check server logs for details. Error: ${apiErr.message}`,
+        },
+      ],
+    };
   }
 }
 

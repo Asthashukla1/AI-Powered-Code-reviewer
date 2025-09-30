@@ -14,7 +14,6 @@ import "prismjs/components/prism-cpp";
 
 /**
  * Renders a single section of the AI Review.
- * @param {{title: string, content: string}} section
  */
 const ReviewSection = ({ section }) => (
   <div className="p-4 bg-gray-800 border border-gray-700 rounded-xl shadow-lg transition hover:shadow-xl hover:border-blue-600">
@@ -25,12 +24,9 @@ const ReviewSection = ({ section }) => (
   </div>
 );
 
-/**
- * Main component for the AI Code Reviewer application.
- */
 export default function CodeReviewer() {
   const [code, setCode] = useState("");
-  const [review, setReview] = useState(null); 
+  const [review, setReview] = useState(null);
   const [loading, setLoading] = useState(false);
   const [language, setLanguage] = useState("javascript");
 
@@ -41,28 +37,29 @@ export default function CodeReviewer() {
     { value: "cpp", label: "C++" },
   ];
 
+  // Request AI review
   const handleReview = useCallback(async () => {
     if (!code.trim()) return;
 
     setLoading(true);
-    setReview(null); 
+    setReview(null);
 
-    // FIX: Correct API endpoint to match Express routing: /ai/review
-    const backendEndpoint = "/ai/review"; 
+    const backendEndpoint = "/ai/review";
 
     try {
-      // Pass both code and selected language to the backend
       const { data } = await axios.post(backendEndpoint, { code, language });
       setReview(
         Array.isArray(data.review) && data.review.length > 0
           ? data.review
-          : [{ title: "AI Response", content: "No structured review was returned. Please check the backend service logs." }]
+          : [{ title: "AI Response", content: "No structured review was returned." }]
       );
     } catch (err) {
       console.error("API Error:", err);
-      // Better error handling extraction for user
-      const errorMessage = err.response?.data?.review?.[0]?.content || err.message || "Failed to connect to the server.";
-      setReview([{ title: "Request Failed", content: `Error: ${errorMessage}. Check console for details.` }]);
+      const errorMessage =
+        err.response?.data?.review?.[0]?.content ||
+        err.message ||
+        "Failed to connect to the server.";
+      setReview([{ title: "Request Failed", content: `Error: ${errorMessage}` }]);
     } finally {
       setLoading(false);
     }
@@ -70,22 +67,24 @@ export default function CodeReviewer() {
 
   return (
     <div className="min-h-screen bg-gray-950 text-gray-100 flex flex-col">
+      {/* Header */}
       <header className="p-4 border-b border-gray-800 flex justify-between items-center bg-gray-900 shadow-md">
         <h1 className="text-3xl font-extrabold text-blue-500">
           Gemini Code Reviewer 🤖
         </h1>
-        <a 
-            href="https://ai.google.dev/gemini-api/docs/api-key" 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className="text-sm text-gray-400 hover:text-blue-400 transition-colors"
+        <a
+          href="https://ai.google.dev/gemini-api/docs/api-key"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-sm text-gray-400 hover:text-blue-400 transition-colors"
         >
-            Get a Gemini API Key
+          Get a Gemini API Key
         </a>
       </header>
-      
+
+      {/* Main Section */}
       <main className="flex-1 grid grid-cols-1 lg:grid-cols-2">
-        {/* Left: Code Editor Section */}
+        {/* Left: Code Editor */}
         <div className="flex flex-col p-6 border-r border-gray-800">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-2xl font-semibold text-blue-400">Code Editor</h2>
@@ -96,7 +95,7 @@ export default function CodeReviewer() {
               onChange={(e) => setLanguage(e.target.value)}
               className="px-3 py-1.5 rounded-lg bg-gray-800 border border-gray-700 text-gray-200 cursor-pointer hover:border-blue-500 focus:ring-blue-500 focus:border-blue-500 transition-all"
             >
-              {languageOptions.map(opt => (
+              {languageOptions.map((opt) => (
                 <option key={opt.value} value={opt.value}>
                   {opt.label}
                 </option>
@@ -104,7 +103,19 @@ export default function CodeReviewer() {
             </select>
           </div>
 
+          {/* Editor with line numbers */}
           <div className="relative flex-1 min-h-[400px]">
+            {/* Line Numbers */}
+            <div
+              className="absolute top-0 left-0 bottom-0 w-10 text-right pr-2 pt-5 text-gray-600 font-mono text-xs select-none"
+              style={{ lineHeight: "1.6" }}
+            >
+              {code.split("\n").map((_, i) => (
+                <div key={i}>{i + 1}</div>
+              ))}
+            </div>
+
+            {/* Editor */}
             <Editor
               value={code}
               onValueChange={setCode}
@@ -119,52 +130,13 @@ export default function CodeReviewer() {
                 fontSize: 14,
                 tabSize: 2,
                 lineHeight: "1.6",
-                minHeight: '100%',
-                // FIX for cursor alignment: Apply necessary padding here.
-                padding: 20, 
-                paddingLeft: 60, // Sufficient left padding for line numbers
+                minHeight: "100%",
+                padding: "20px 20px 20px 50px", // Left padding for gutter
               }}
             />
-            
-            {/* FIX: Custom CSS for line numbers adjusted for correct cursor alignment */}
-            <style jsx="true" global="true">{`
-                .editor-wrapper {
-                  counter-reset: line;
-                  /* Removing padding from the outer div as padding in style prop targets inner content */
-                  padding-left: 0 !important; 
-                }
-        
-                .editor-wrapper textarea {
-                    white-space: pre-wrap;
-                }
-
-                .editor-wrapper pre code {
-                  counter-reset: line;
-                }
-        
-                .editor-wrapper pre code span {
-                  display: block;
-                  counter-increment: line;
-                  position: relative; 
-                }
-        
-                .editor-wrapper pre code span::before {
-                    content: counter(line);
-                    display: inline-block;
-                    width: 2.5em; /* Width of the line number column */
-                    text-align: right;
-                    color: #4b5563; /* Tailwind gray-600 */
-                    user-select: none;
-                    font-size: 12px;
-                    
-                    /* New Alignment Fix: Absolute position the line number */
-                    position: absolute;
-                    left: 20px; 
-                    transform: translateX(-100%); 
-                }
-              `}</style>
           </div>
-          
+
+          {/* Review Button */}
           <button
             onClick={handleReview}
             disabled={loading || !code.trim()}
@@ -175,9 +147,25 @@ export default function CodeReviewer() {
           >
             {loading ? (
               <>
-                <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                <svg
+                  className="animate-spin h-5 w-5 text-white"
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  ></circle>
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                  ></path>
                 </svg>
                 <span>Reviewing Code...</span>
               </>
@@ -201,27 +189,28 @@ export default function CodeReviewer() {
               </div>
             )}
 
-            {review && review.length > 0 && (
-              review.map((section, idx) => (
-                <ReviewSection key={idx} section={section} />
-              ))
-            )}
+            {review &&
+              review.length > 0 &&
+              review.map((section, idx) => <ReviewSection key={idx} section={section} />)}
 
             {loading && (
               <div className="p-6 text-center text-blue-400">
                 <p className="font-medium">Waiting for AI response, please wait...</p>
               </div>
             )}
-            
+
             {review && review.length === 0 && !loading && (
-                <div className="p-6 bg-gray-800 border border-red-500 rounded-xl text-center">
-                    <p className="text-red-400">Failed to retrieve or parse review content. Check the server console for errors.</p>
-                </div>
+              <div className="p-6 bg-gray-800 border border-red-500 rounded-xl text-center">
+                <p className="text-red-400">
+                  Failed to retrieve or parse review content. Check the server console for errors.
+                </p>
+              </div>
             )}
           </div>
         </div>
       </main>
-      
+
+      {/* Footer */}
       <footer className="p-3 border-t border-gray-800 text-center text-xs text-gray-500 bg-gray-900">
         Powered by Google Gemini API.
       </footer>
