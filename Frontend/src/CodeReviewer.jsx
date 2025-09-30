@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import Editor from "react-simple-code-editor";
 import Prism from "prismjs";
 import "prismjs/themes/prism-tomorrow.css"; // Dark theme
@@ -8,136 +8,219 @@ import axios from "axios";
 import "prismjs/components/prism-javascript";
 import "prismjs/components/prism-python";
 import "prismjs/components/prism-java";
-import "prismjs/components/prism-clike"; // required
-import "prismjs/components/prism-c";     // required
+import "prismjs/components/prism-clike";
+import "prismjs/components/prism-c";
 import "prismjs/components/prism-cpp";
 
+/**
+ * Renders a single section of the AI Review.
+ * @param {{title: string, content: string}} section
+ */
+const ReviewSection = ({ section }) => (
+  <div className="p-4 bg-gray-800 border border-gray-700 rounded-xl shadow-lg transition hover:shadow-xl hover:border-blue-600">
+    <h3 className="font-bold text-lg text-blue-400 mb-2">{section.title}</h3>
+    {/* Use <p> instead of <pre> if content is already pre-formatted or Markdown, for better wrapping */}
+    <p className="whitespace-pre-wrap text-gray-300 text-sm leading-relaxed">
+      {section.content}
+    </p>
+  </div>
+);
+
+/**
+ * Main component for the AI Code Reviewer application.
+ */
 export default function CodeReviewer() {
   const [code, setCode] = useState("");
-  const [review, setReview] = useState([]);
+  // Use null for initial state to display the introductory message
+  const [review, setReview] = useState(null); 
   const [loading, setLoading] = useState(false);
   const [language, setLanguage] = useState("javascript");
 
-  const handleReview = async () => {
-  if (!code.trim()) return;
-  setLoading(true);
+  // Language options must align with the Prism imports
+  const languageOptions = [
+    { value: "javascript", label: "JavaScript" },
+    { value: "python", label: "Python" },
+    { value: "java", label: "Java" },
+    { value: "cpp", label: "C++" },
+  ];
 
-  try {
-    const { data } = await axios.post("/api/review", { code, language });
-    setReview(
-      data.review || [{ title: "AI Review", content: "No response from server" }]
-    );
-  } catch (err) {
-    console.error(err);
-    setReview([{ title: "AI Review", content: "Failed to fetch review" }]);
-  }
+  const handleReview = useCallback(async () => {
+    if (!code.trim()) return;
 
-  setLoading(false);
-};
+    setLoading(true);
+    setReview(null); 
 
+    // FIX: Correct API endpoint to match Express routing: /ai is the base route + /review is the post route
+    const backendEndpoint = "/ai/review"; 
+
+    try {
+      const { data } = await axios.post(backendEndpoint, { code, language });
+      setReview(
+        Array.isArray(data.review) && data.review.length > 0
+          ? data.review
+          : [{ title: "AI Response", content: "No structured review was returned. Please check the backend service logs." }]
+      );
+    } catch (err) {
+      console.error("API Error:", err);
+      // Better error handling for user
+      const errorMessage = err.response?.data?.review?.[0]?.content || err.message || "Failed to connect to the server.";
+      setReview([{ title: "Request Failed", content: `Error: ${errorMessage}. Check console for details.` }]);
+    } finally {
+      setLoading(false);
+    }
+  }, [code, language]);
 
   return (
-    <div className="h-screen w-screen grid grid-cols-2 bg-gray-900 text-gray-200">
-      {/* Left: Code Editor */}
-      <div className="flex flex-col p-4 border-r border-gray-700">
-        <div className="flex justify-between items-center mb-2">
-          <h2 className="text-xl font-semibold text-blue-400">Your Code</h2>
-
-          {/* Language dropdown */}
-          <select
-            value={language}
-            onChange={(e) => setLanguage(e.target.value)}
-            className="ml-4 px-2 py-1 rounded bg-gray-800 border border-gray-600 text-gray-200"
-          >
-            <option value="javascript">JavaScript</option>
-            <option value="python">Python</option>
-            <option value="java">Java</option>
-            <option value="cpp">C++</option>
-          </select>
-        </div>
-
-        <div className="relative flex-1">
-          <Editor
-            value={code}
-            onValueChange={setCode}
-            highlight={(inputCode) =>
-              Prism.highlight(inputCode, Prism.languages[language], language)
-            }
-            padding={10}
-            className="editor-with-lines w-full h-full font-mono text-sm bg-gray-800 text-gray-200 border border-gray-600 rounded-lg focus:outline-none overflow-auto"
-            placeholder="Paste your code here..."
-            style={{
-              fontFamily: '"Fira Code", monospace',
-              fontSize: 14,
-              tabSize: 2,
-              lineHeight: "1.5",
-            }}
-          />
-        </div>
-        <button
-          onClick={handleReview}
-          disabled={loading || !code.trim()}
-          className="mt-3 self-end px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white disabled:bg-gray-600"
+    <div className="min-h-screen bg-gray-950 text-gray-100 flex flex-col">
+      <header className="p-4 border-b border-gray-800 flex justify-between items-center bg-gray-900 shadow-md">
+        <h1 className="text-3xl font-extrabold text-blue-500">
+          Gemini Code Reviewer 🤖
+        </h1>
+        <a 
+            href="https://ai.google.dev/gemini-api/docs/api-key" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="text-sm text-gray-400 hover:text-blue-400 transition-colors"
         >
-          {loading ? "Reviewing..." : "Review Code"}
-        </button>
-      </div>
+            Get a Gemini API Key
+        </a>
+      </header>
+      
+      <main className="flex-1 grid grid-cols-1 lg:grid-cols-2">
+        {/* Left: Code Editor Section */}
+        <div className="flex flex-col p-6 border-r border-gray-800">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-2xl font-semibold text-blue-400">Code Editor</h2>
 
-      {/* Right: AI Review */}
-      <div className="flex flex-col p-4 overflow-y-auto">
-        <h2 className="text-xl font-semibold mb-4 text-blue-400">AI Review</h2>
-        <div className="flex-1 space-y-4">
-          {review.length > 0 ? (
-            review.map((section, idx) => (
-              <div
-                key={idx}
-                className="p-3 bg-gray-800 border border-gray-700 rounded-lg shadow-sm hover:shadow-lg transition"
-              >
-                <h3 className="font-semibold text-blue-300 mb-1">
-                  {section.title}
-                </h3>
-                <pre className="whitespace-pre-wrap text-gray-200">
-                  {section.content}
-                </pre>
-              </div>
-            ))
-          ) : (
-            <p className="text-gray-400">AI feedback will appear here...</p>
-          )}
+            {/* Language dropdown */}
+            <select
+              value={language}
+              onChange={(e) => setLanguage(e.target.value)}
+              className="px-3 py-1.5 rounded-lg bg-gray-800 border border-gray-700 text-gray-200 cursor-pointer hover:border-blue-500 focus:ring-blue-500 focus:border-blue-500 transition-all"
+            >
+              {languageOptions.map(opt => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="relative flex-1 min-h-[400px]">
+            <Editor
+              value={code}
+              onValueChange={setCode}
+              // Use a fallback grammar if the selected language is not supported by Prism (e.g., 'clike')
+              highlight={(inputCode) => {
+                const grammar = Prism.languages[language] || Prism.languages.clike;
+                return Prism.highlight(inputCode, grammar, language);
+              }}
+              padding={20}
+              className="editor-with-lines w-full h-full font-mono text-sm bg-gray-800 text-gray-200 border border-gray-700 rounded-xl focus:outline-none overflow-auto shadow-inner"
+              placeholder={`Paste your ${language} code here...`}
+              style={{
+                fontFamily: '"Fira Code", "Consolas", monospace',
+                fontSize: 14,
+                tabSize: 2,
+                lineHeight: "1.6",
+                minHeight: '100%',
+              }}
+            />
+            {/* Custom CSS for line numbers - moved inside component as style tag with updated colors */}
+            <style jsx="true" global="true">{`
+                .editor-with-lines {
+                  counter-reset: line;
+                  padding-left: 3.5em !important; /* Increased padding for line numbers */
+                  white-space: pre-wrap;
+                }
+        
+                .editor-with-lines textarea {
+                    white-space: pre-wrap;
+                }
+
+                .editor-with-lines pre code {
+                  counter-reset: line;
+                }
+        
+                .editor-with-lines pre code span {
+                  display: block;
+                  counter-increment: line;
+                }
+        
+                .editor-with-lines pre code span::before {
+                  content: counter(line);
+                  display: inline-block;
+                  width: 2em;
+                  margin-right: 1.2em;
+                  text-align: right;
+                  color: #4b5563; /* Tailwind gray-600 */
+                  user-select: none;
+                  font-size: 12px;
+                }
+              `}</style>
+          </div>
+          
+          <button
+            onClick={handleReview}
+            disabled={loading || !code.trim()}
+            className="mt-6 w-full py-3 rounded-xl font-bold transition-all duration-200 ease-in-out
+                       bg-blue-600 hover:bg-blue-500 text-white shadow-md shadow-blue-600/30
+                       disabled:bg-gray-700 disabled:shadow-none disabled:text-gray-400
+                       flex items-center justify-center space-x-2"
+          >
+            {loading ? (
+              <>
+                <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <span>Reviewing Code...</span>
+              </>
+            ) : (
+              <span>Review Code</span>
+            )}
+          </button>
         </div>
-      </div>
 
-      {/* Custom CSS for line numbers */}
-      <style>{`
-        .editor-with-lines {
-          counter-reset: line;
-          padding-left: 3em; /* space for line numbers */
-          white-space: pre-wrap;
-        }
+        {/* Right: AI Review Section */}
+        <div className="flex flex-col p-6 overflow-y-auto bg-gray-900">
+          <h2 className="text-2xl font-semibold mb-6 text-green-400 border-b border-gray-700 pb-2">
+            AI Review & Feedback
+          </h2>
+          <div className="flex-1 space-y-6">
+            {review === null && !loading && (
+              <div className="p-6 bg-gray-800 border border-gray-700 rounded-xl text-center">
+                <p className="text-gray-400 italic">
+                  Enter your code on the left and click **Review Code** to get AI feedback.
+                </p>
+              </div>
+            )}
 
-        .editor-with-lines pre {
-          position: relative;
-        }
+            {review && review.length > 0 && (
+              review.map((section, idx) => (
+                <ReviewSection key={idx} section={section} />
+              ))
+            )}
 
-        .editor-with-lines pre code {
-          counter-reset: line;
-        }
-
-        .editor-with-lines pre code span {
-          display: block;
-          counter-increment: line;
-        }
-
-        .editor-with-lines pre code span::before {
-          content: counter(line);
-          display: inline-block;
-          width: 2em;
-          margin-right: 1em;
-          text-align: right;
-          color: #555;
-          user-select: none;
-        }
-      `}</style>
+            {loading && (
+              <div className="p-6 text-center text-blue-400">
+                <p className="font-medium">Waiting for AI response, please wait...</p>
+              </div>
+            )}
+            
+            {/* Fallback for empty or unsuccessful response */}
+            {review && review.length === 0 && !loading && (
+                <div className="p-6 bg-gray-800 border border-red-500 rounded-xl text-center">
+                    <p className="text-red-400">Failed to retrieve or parse review content. Check the server console for errors.</p>
+                </div>
+            )}
+          </div>
+        </div>
+      </main>
+      
+      <footer className="p-3 border-t border-gray-800 text-center text-xs text-gray-500 bg-gray-900">
+        Powered by Google Gemini API.
+      </footer>
     </div>
   );
 }

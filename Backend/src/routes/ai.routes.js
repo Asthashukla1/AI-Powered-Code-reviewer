@@ -1,7 +1,8 @@
 const express = require('express');
 const router = express.Router();
-const aiController = require('../controllers/ai.controller');
+// Use object destructuring for clean import
+const { getReview } = require('../controllers/ai.controller');
 
-router.post('/review', aiController.getReview);
+router.post('/review', getReview);
 
 module.exports = router;
